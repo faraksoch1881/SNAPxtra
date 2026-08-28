@@ -24,7 +24,6 @@ Run **step-by-step** or in **batch mode**. Export products for time-series analy
 - [How to run](#how-to-run)
 - [Processing steps](#processing-steps)
 - [Outputs](#outputs)
-- [Wiki documentation](#wiki-documentation)
 
 ---
 
