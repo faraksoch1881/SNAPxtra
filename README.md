@@ -1,6 +1,9 @@
 # SNAPxtra — Sentinel-1 InSAR Workflow
 
 **SNAPxtra** builds interferometric stacks from **Sentinel-1** data using [ESA SNAP](http://step.esa.int/main/download/snap-download/), [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/), and Python automation.
+This is cross platform compatible supported by Windows, Ubuntu and Mac.
+
+This code was successfully tested in PC with SNAP V8 and Ubuntu 20.04 with 64 GB RAM and 2 TB Hard disk. 
 
 | Mode | Output | Post-processing |
 |------|--------|-----------------|
