@@ -27,6 +27,7 @@ Run **step-by-step** or in **batch mode**. Export products for time-series analy
 - [How to run](#how-to-run)
 - [Processing steps](#processing-steps)
 - [Outputs](#outputs)
+- [Post Processing Guide (LiCSBAS and StaMPS Instructions)](#post-processing-guide)
 
 ---
 
@@ -374,10 +375,286 @@ Run `python check_install.py <config>` to verify.
 
 ---
 
-## Related links
 
-- [ESA SNAP](http://step.esa.int/main/download/snap-download/)
-- [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/)
-- [ASF Data Search](https://search.asf.alaska.edu/)
-- [LiCSBAS](https://github.com/yumorishita/LiCSBAS)
-- [StaMPS](https://github.com/dbekaert/StaMPS)
+
+  # Post Processing Guide
+
+**Time-series analysis and deformation estimation after [SNAPxtra](snapxtra_main.py)**
+
+
+## LiCSBAS workflow
+
+SNAPxtra already produces a geocoded stack in `GEOC/`, so **LiCSBAS Step 01 (download GeoTIFFs) is not required**. Start from multilooking / preparation onward.
+
+### Install
+
+Follow the official guide: **[LiCSBAS2 on GitHub](https://github.com/yumorishita/LiCSBAS2)**
+
+### Batch example (Ubuntu)
+
+Create `job_batch.sh` in your project directory (the folder that contains `GEOC/`):
+
+```bash
+#!/bin/bash
+set -e
+
+cd /path/to/your/project/proj_dsc   # folder containing GEOC/
+
+# Optional earlier steps (uncomment and adjust as needed):
+# LiCSBAS02_ml_prep.py -h          # read defaults with -h before changing parameters
+# LiCSBAS02_ml_prep.py -i GEOC -o GEOCml1 --n_para 6
+# LiCSBAS05op_clip_unw.py -i GEOCml1 -o GEOCml1clip -g W/E/S/N --n_para 4
+# LiCSBAS11_check_unw.py -d GEOCml1clip -t TS_GEOCml1clip
+
+LiCSBAS12_loop_closure.py -d GEOCml1clip -t TS_GEOCml1clip --n_para 6
+# Tighter loop-closure threshold example:
+# LiCSBAS12_loop_closure.py -d GEOCml1clip -t TS_GEOCml1clip -l 5 --n_para 6
+
+LiCSBAS13_sb_inv.py -d GEOCml1clip -t TS_GEOCml1clip --n_unw_r_thre 0.5 --n_para 6
+LiCSBAS14_vel_std.py -t TS_GEOCml1clip
+LiCSBAS15_mask_ts.py -t TS_GEOCml1clip
+LiCSBAS16_filt_ts.py -t TS_GEOCml1clip --n_para 6
+```
+
+Make it executable and run:
+
+```bash
+chmod +x job_batch.sh
+./job_batch.sh
+```
+
+> **Tip:** Use `-h` on any LiCSBAS script to see accepted parameters and defaults before editing the batch file.  
+> LiCSBAS2 also ships `batch_LiCSBAS.sh` — you can adapt that template instead of writing your own.
+
+### Velocity maps & GeoTIFF export
+
+From inside the time-series directory (e.g. `TS_GEOCml1clip/`):
+
+```bash
+# Build masked velocity product, then export
+LiCSBAS_cum2vel.py
+LiCSBAS_disp_img.py -i 20220315_20260411.vel.mskd -p info/EQA.dem_par --kmz asc_vel.kmz
+LiCSBAS_flt2geotiff.py -i 20220315_20260411.vel.mskd -p info/EQA.dem_par
+```
+
+Replace the date stamp in the filename with your own velocity product name.
+
+---
+
+## StaMPS — PS mode
+
+**Folder:** `Stamps_ps/INSAR_{master}/`  
+**Install:** [StaMPS](https://github.com/dbekaert/StaMPS) — see the StaMPS manual for setup.
+
+Helper MATLAB scripts (`insar_time_ps.m`, `fix_stamps_csv.py`, etc.) are available in the StaMPS `matlab/` folder (also bundled in some project exports).
+
+### Check parameters
+
+In MATLAB, inside `INSAR_{master}/`:
+
+```matlab
+ps_info
+
+stamps(1,1)
+stamps(2,2)
+stamps(3,3)
+stamps(4,4)
+stamps(5,5)
+stamps(6,6)
+```
+
+### Atmospheric correction (TRAIN) + steps 7–8
+
+```matlab
+% Install TRAIN, then:
+aps_linear
+
+stamps(7,7)
+stamps(6,7)   % re-run step 6 after APS if needed
+stamps(8,8)
+```
+
+### Batch mode — `insar_time_ps`
+
+Runs steps 1–7 (including APS and re-runs) in one call:
+
+```matlab
+insar_time_ps()        % all steps 1–7
+insar_time_ps(3)       % from step 3 to end
+insar_time_ps(2, 4)    % steps 2 through 4 only
+insar_time_ps(1, 1)    % step 1 only
+```
+
+### Plot results
+
+```matlab
+ps_plot('v')                              % velocity
+ps_plot('v-do')                           % velocity − orbital & DEM error
+ps_plot('v-dao','a_linear')               % after TRAIN (aps_linear)
+
+plot_sb_baselines                         % baseline plot
+```
+
+---
+
+## StaMPS — SBAS mode
+
+**Folder:** `Stamps_sbas/INSAR_{master}/`
+
+### Check parameters
+
+```matlab
+sb_info
+```
+
+Confirm small-baseline processing is enabled:
+
+```matlab
+% small_baseline_flag should be 'y'
+setparm('small_baseline_flag','y')
+```
+
+### Batch mode — `insar_time_sb`
+
+Same calling convention as PS:
+
+```matlab
+insar_time_sb()        % all steps
+insar_time_sb(3)       % from step 3 to end
+insar_time_sb(2, 4)    % steps 2–4 only
+insar_time_sb(1, 1)    % step 1 only
+```
+
+### Plot baselines
+
+```matlab
+sb_baseline_plot
+```
+
+---
+
+## Merging PS and SBAS
+
+To combine PS and SBAS pixels in one StaMPS project:
+
+1. **During SNAPxtra export** — leave `Range` **empty** in the config for StaMPS SBAS so both PS and SBAS stacks stay single-look and grid-compatible.
+2. **Before `mt_prep_snap`** — copy contents of `Stamps_ps/INSAR_{master}/` into `Stamps_sbas/INSAR_{master}/`.
+
+---
+
+## Troubleshooting StaMPS
+
+### sb_loadinitial.m error in stamps(1,1) or stamps(2,2)
+Replace sb_load_initial.m in original StaMPS matlab folder path with same file provided here
+
+### `stamps(1,1)` or `stamps(2,2)` fails on large scenes
+
+Split the scene into **multiple patches** instead of a single patch:
+
+1. Check file sizes inside each `PATCH` folder.
+2. Remove patches with **0-byte** files from `patch.list`, **or**
+3. Run `stamps(1,1)` through `stamps(5,5)` on each patch individually and exclude patches that fail from `patch.list`.
+
+---
+
+## Export & visualization
+
+### A. QGIS InSAR Explorer (time series CSV)
+
+After StaMPS **step 8**, select points and export:
+
+**PS mode**
+
+```matlab
+ps_plot('v-do','ts')                      % without TRAIN
+ps_plot('v-dao','a_linear','ts')          % with TRAIN (aps_linear)
+```
+
+Click on the map and set a **radius** large enough that all points of interest fall inside the circle. Increase radius in steps (e.g. `+10000`, `+30000`) until the full area is covered.
+
+```matlab
+ps_export_csv_ps('v-dao','filename.csv')
+```
+
+**SBAS mode**
+
+```matlab
+ps_export_csv_sbas('v-dao','filename.csv')
+```
+
+**Reformat for QGIS**
+
+```bash
+python fix_stamps_csv.py filename.csv insar_filename.csv
+```
+
+**In QGIS**
+
+1. Install the **QGIS InSAR Explorer** plugin
+2. *Layer → Add Layer → Add Delimited Text Layer* → select `insar_filename.csv`
+3. Use InSAR Explorer to explore; export rasters as GeoTIFF if needed
+
+---
+
+### B. KML export
+
+```matlab
+ps_save_kml_ps('v-dao','ps_vel.kml', 50, 1)
+%                                      │   └─ opacity (0–1)
+%                                      └──── group every N points as one placemark
+```
+
+---
+
+### C. Hillshade background
+
+Prepare a shaded DEM for nicer `ps_plot` figures.
+
+Run from inside `INSAR_{master}/`:
+
+```bash
+stamps_dem_prep.py --geo projected_dem.par --dem_api 'YOUR_OPENTOPOGRAPHY_API_KEY'
+```
+
+> Free API keys: [OpenTopography](https://portal.opentopography.org/)
+
+This creates `*.raw` and `demparms.in`. Then in MATLAB:
+
+```matlab
+ps_plot('v-dao', 2)    % velocity with hillshade background
+```
+
+---
+
+## Workflow diagram
+
+```text
+SNAPxtra (ps_sbas_snapxtra.py)
+        │
+        ├─ insar_target=1 ──► GEOC/ ──► LiCSBAS12+ ──► velocity / GeoTIFF / KMZ
+        │
+        └─ insar_target=2 ──┬─ PS  (Stamps_ps/)  ──► stamps / insar_time_ps ──► ps_plot, CSV, KML
+                            └─ SBAS (Stamps_sbas/) ──► insar_time_sb ──► sb_baseline_plot, CSV
+```
+
+---
+
+## Further reading
+
+| Resource | Description |
+|----------|-------------|
+| [LiCSBAS2](https://github.com/yumorishita/LiCSBAS2) | LiCSBAS install & documentation |
+| [StaMPS](https://github.com/dbekaert/StaMPS) | StaMPS install & manual |
+| [StaMPS GIS blog (GitLab)](https://gitlab.com/Rexthor/gis-blog/-/tree/master/StaMPS) | Tutorials, plotting, GIS tips |
+| [ESA SNAP](http://step.esa.int/main/download/snap-download/)
+| [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/)
+| [ASF Data Search](https://search.asf.alaska.edu/)
+
+---
+
+## Related SNAPxtra docs
+
+- **Main workflow:** [README.md](README.md)
+- **Sample config:** `insar_proj_sample.config`
+- **Dependency check:** `python sbas_check_install.py <config>`
+
