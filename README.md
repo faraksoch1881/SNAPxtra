@@ -530,6 +530,12 @@ insar_time_sb(1, 1)    % step 1 only
 ```matlab
 sb_baseline_plot
 ```
+### Network Information
+
+```matlab
+sb_info_filt
+SBAS requires connected network. If there is disjoint network forming two or more then two subsets not connected with each other. InSAR will fail. sb_info_filt will analyze the whole network diagram and display information about total subsets, total pairs in each subsets so user can decide to either process missing pair to connect two pairs and include the pairs in SMALL_BASELINE/  and run from stamps(1,1) or choose the network diagram that has highest number of connected pairs. 
+```
 
 ---
 
@@ -544,7 +550,7 @@ To combine PS and SBAS pixels in one StaMPS project:
 
 ## Troubleshooting StaMPS
 
-### sb_loadinitial.m error in stamps(1,1) or stamps(2,2)
+### sb_load_initial.m error in stamps(1,1) or stamps(2,2)
 Replace sb_load_initial.m in original StaMPS matlab folder path with same file provided here
 
 ### `stamps(1,1)` or `stamps(2,2)` fails on large scenes
