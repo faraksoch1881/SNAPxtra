@@ -1,0 +1,52 @@
+<graph id="Graph">
+  <version>1.0</version>
+  <node id="Read">
+    <operator>Read</operator>
+    <sources/>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <useAdvancedOptions>false</useAdvancedOptions>
+      <file>${INPUT_STACK_FILE}</file>
+      <copyMetadata>true</copyMetadata>
+      <bandNames/>
+      <pixelRegion>0,0,21579,2983</pixelRegion>
+      <maskNames/>
+    </parameters>
+  </node>
+  <node id="MultiMasterInSAR">
+    <operator>MultiMasterInSAR</operator>
+    <sources>
+      <sourceProduct refid="Read"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <orbitDegree>4</orbitDegree>
+      <pairs>${INTERFEROGRAM_PAIRS}</pairs>
+      <includeWavenumber>false</includeWavenumber>
+      <includeIncidenceAngle>true</includeIncidenceAngle>
+      <includeLatLon>false</includeLatLon>
+      <cohWindowAz>10</cohWindowAz>
+      <cohWindowRg>10</cohWindowRg>
+    </parameters>
+  </node>
+  <node id="Write">
+    <operator>Write</operator>
+    <sources>
+      <sourceProduct refid="MultiMasterInSAR"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <file>${OUTPUT_MMIFG_FILE}</file>
+      <formatName>BEAM-DIMAP</formatName>
+    </parameters>
+  </node>
+  <applicationData id="Presentation">
+    <Description/>
+    <node id="Read">
+      <displayPosition x="312.0" y="140.0"/>
+    </node>
+    <node id="MultiMasterInSAR">
+      <displayPosition x="370.0" y="260.0"/>
+    </node>
+    <node id="Write">
+            <displayPosition x="812.0" y="158.0"/>
+    </node>
+  </applicationData>
+</graph>

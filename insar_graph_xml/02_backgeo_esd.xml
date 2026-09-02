@@ -1,0 +1,78 @@
+<graph id="Graph">
+  <version>1.0</version>
+  <node id="Back-Geocoding">
+    <operator>Back-Geocoding</operator>
+    <sources>
+      <sourceProduct.3 refid="ProductSet-Reader"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <demName>${dem_name_model}</demName>
+      <demResamplingMethod>BICUBIC_INTERPOLATION</demResamplingMethod>
+      <externalDEMFile/>
+      <externalDEMNoDataValue>0.0</externalDEMNoDataValue>
+      <resamplingType>BISINC_5_POINT_INTERPOLATION</resamplingType>
+      <maskOutAreaWithoutElevation>true</maskOutAreaWithoutElevation>
+      <outputRangeAzimuthOffset>false</outputRangeAzimuthOffset>
+      <outputDerampDemodPhase>false</outputDerampDemodPhase>
+      <disableReramp>false</disableReramp>
+    </parameters>
+  </node>
+  <node id="Enhanced-Spectral-Diversity">
+    <operator>Enhanced-Spectral-Diversity</operator>
+    <sources>
+      <sourceProduct refid="Back-Geocoding"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <fineWinWidthStr>512</fineWinWidthStr>
+      <fineWinHeightStr>512</fineWinHeightStr>
+      <fineWinAccAzimuth>16</fineWinAccAzimuth>
+      <fineWinAccRange>16</fineWinAccRange>
+      <fineWinOversampling>128</fineWinOversampling>
+      <xCorrThreshold>0.1</xCorrThreshold>
+      <cohThreshold>0.3</cohThreshold>
+      <numBlocksPerOverlap>10</numBlocksPerOverlap>
+      <esdEstimator>Periodogram</esdEstimator>
+      <weightFunc>Inv Quadratic</weightFunc>
+      <temporalBaselineType>Number of images</temporalBaselineType>
+      <maxTemporalBaseline>4</maxTemporalBaseline>
+      <integrationMethod>L1 and L2</integrationMethod>
+      <doNotWriteTargetBands>false</doNotWriteTargetBands>
+      <useSuppliedRangeShift>false</useSuppliedRangeShift>
+      <overallRangeShift>0.0</overallRangeShift>
+      <useSuppliedAzimuthShift>false</useSuppliedAzimuthShift>
+      <overallAzimuthShift>0.0</overallAzimuthShift>
+    </parameters>
+  </node>
+  <node id="Write">
+    <operator>Write</operator>
+    <sources>
+      <sourceProduct refid="Enhanced-Spectral-Diversity"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <file>${OUTPUT_STACK_FILE}</file>
+      <formatName>BEAM-DIMAP</formatName>
+    </parameters>
+  </node>
+  <node id="ProductSet-Reader">
+    <operator>ProductSet-Reader</operator>
+    <sources/>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+       <fileList>${FILE_LIST_FROM_STEP01}</fileList>
+    </parameters>
+  </node>
+  <applicationData id="Presentation">
+    <Description/>
+    <node id="Back-Geocoding">
+      <displayPosition x="471.0" y="184.0"/>
+    </node>
+    <node id="Enhanced-Spectral-Diversity">
+      <displayPosition x="600.0" y="251.0"/>
+    </node>
+    <node id="Write">
+            <displayPosition x="910.0" y="114.0"/>
+    </node>
+    <node id="ProductSet-Reader">
+      <displayPosition x="299.0" y="118.0"/>
+    </node>
+  </applicationData>
+</graph>
