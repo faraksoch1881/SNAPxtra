@@ -644,6 +644,305 @@ SNAPxtra (ps_sbas_snapxtra.py)
 ```
 
 ---
+# StaMPS Processing Notes, GCC Patch, and Patch Estimation
+
+## ⚠️ Warning: StaMPS Patch for Newer GCC Versions
+
+When StaMPS is compiled with newer GCC versions, `mt_prep_snap` may return `inf` while calculating the **mean amplitude**.
+
+This issue was identified and tested with **StaMPS 4.0b6**.
+
+### Problem
+
+The issue is related to the byte-swapping implementation used in StaMPS. With newer GCC versions, the original implementation can result in incorrect amplitude values, causing `mt_prep_snap` to report:
+
+```text
+inf
+```
+
+for the mean amplitude.
+
+The issue was resolved by modifying the affected byte-swapping function to use a `void` return type, since the function performs the byte swap in place and does not need to return a value.
+
+### Apply the Patch
+
+Replace the following files in the StaMPS `src/` directory with the patched versions:
+
+```text
+src/
+├── calamp.c
+├── selpsc_patch.c
+└── selsbc_patch.c
+```
+
+Recompile the affected programs:
+
+```bash
+make calamp
+make selpsc_patch
+make selsbc_patch
+```
+
+Then reinstall StaMPS:
+
+```bash
+make install
+```
+
+> **Tested version:** StaMPS 4.0b6
+>
+> The `inf` mean-amplitude issue was reproduced and successfully resolved using the modifications described above.
+
+---
+
+## Processing Tips
+
+### Check Wrapped Phase Before Continuing
+
+Run the processing workflow through **Step 13**.
+
+At this stage, PNG images of the wrapped interferometric phase are saved in:
+
+```text
+phase_unw_intf/
+```
+
+Inspect these images for bad or problematic interferograms before continuing.
+
+If a bad interferogram is identified:
+
+1. Identify the corresponding interferogram pair.
+2. Locate the `.img` file generated in the **Step 9 output**.
+3. Remove the corresponding `.img` file.
+4. Continue with the remaining processing steps.
+
+---
+
+## Patch Estimation
+
+The general syntax for `mt_prep_snap` is:
+
+```bash
+mt_prep_snap yyyymmdd datadir da_thresh [rg_patches az_patches rg_overlap az_overlap maskfile]
+```
+
+where:
+
+```text
+yyyymmdd                 = master/reference date
+datadir                  = data directory with the expected StaMPS structure
+da_thresh                = amplitude dispersion threshold
+                            typical values: 0.4 for PS, 0.6 for SB
+rg_patches (default 1)   = number of patches in range
+az_patches (default 1)   = number of patches in azimuth
+rg_overlap (default 50)  = overlapping pixels between patches in range
+az_overlap (default 50)  = overlapping pixels between patches in azimuth
+maskfile                 = optional mask file
+```
+
+### Estimate the Number of Candidate Pixels
+
+A helper script, `ps_cands.py`, can be used to estimate the number of candidate pixels before selecting the number of patches.
+
+Usage:
+
+```bash
+python ps_cands.py path da_thresh
+```
+
+where:
+
+- `path` is the path to the `INSAR_YYYYMMDD` directory.
+- `da_thresh` is the amplitude dispersion threshold.
+
+Example:
+
+```bash
+python ps_cands.py /project/user/proj_dsc/Stamps_ps/INSAR_20250315/ 0.4
+```
+
+Example output:
+
+```text
+SLCs: 64   grid: 39699 x 9115
+
+mean 1/64 20240108.rslc 82.070
+mean 2/64 20240120.rslc 73.341
+
+da 1/64
+da 2/64
+
+6,208,229
+```
+
+In this example, approximately **6.2 million candidate pixels** were identified.
+
+> **Tip:** Decreasing `da_thresh` applies a stricter amplitude-dispersion criterion. This reduces the number of selected pixels and retains pixels with more stable amplitude behavior.
+
+---
+
+## Selecting the Number of Patches
+
+The example above identified approximately:
+
+```text
+6,208,229 candidate pixels
+```
+
+The goal is to keep the number of candidate pixels below approximately **1 million per patch**.
+
+For this dataset, **10 patches** were selected:
+
+```text
+rg_patches = 5
+az_patches = 2
+```
+
+Therefore:
+
+```text
+Total patches = 5 × 2 = 10
+```
+
+Assuming the candidate pixels were uniformly distributed:
+
+```text
+6,208,229 / 10 ≈ 620,823 candidate pixels per patch
+```
+
+The actual number of candidates in each patch may vary because candidate pixels are not necessarily distributed uniformly across the scene.
+
+---
+
+## Estimate Patch Dimensions
+
+The SLC dimensions are:
+
+```text
+Range   = 39699 pixels
+Azimuth = 9115 pixels
+```
+
+Using:
+
+```text
+rg_patches = 5
+az_patches = 2
+```
+
+the approximate patch dimensions are:
+
+### Range
+
+```text
+39699 / 5 ≈ 7940 pixels
+```
+
+### Azimuth
+
+```text
+9115 / 2 ≈ 4558 pixels
+```
+
+Therefore, each patch is approximately:
+
+```text
+8000 × 4500 pixels
+```
+
+before accounting for overlap.
+
+---
+
+## Set Patch Overlap
+
+An overlap of approximately **10% of the patch dimensions** was selected.
+
+For an approximate patch size of:
+
+```text
+8000 × 4500 pixels
+```
+
+the overlap was set to:
+
+```text
+rg_overlap = 800
+az_overlap = 400
+```
+
+This corresponds approximately to:
+
+```text
+Range overlap   ≈ 10%
+Azimuth overlap ≈ 9%
+```
+
+Therefore, the patch configuration is:
+
+```text
+rg_patches  = 5
+az_patches  = 2
+rg_overlap  = 800
+az_overlap  = 400
+```
+
+---
+
+## Final `mt_prep_snap` Command
+
+For this dataset, the selected parameters are:
+
+```text
+da_thresh   = 0.45
+rg_patches  = 5
+az_patches  = 2
+rg_overlap  = 800
+az_overlap  = 400
+```
+
+Run:
+
+```bash
+mt_prep_snap yyyymmdd datadir 0.45 5 2 800 400
+```
+
+For example:
+
+```bash
+mt_prep_snap 20250315 /path/to/INSAR_20250315 0.45 5 2 800 400
+```
+
+---
+
+## Example Configuration Summary
+
+For an SLC with dimensions:
+
+```text
+39699 × 9115
+```
+
+and approximately **6.2 million candidate pixels**, the selected configuration is:
+
+| Parameter | Value |
+|---|---:|
+| `da_thresh` | `0.45` |
+| `rg_patches` | `5` |
+| `az_patches` | `2` |
+| Total patches | `10` |
+| Approximate patch size | `8000 × 4500` pixels |
+| `rg_overlap` | `800` pixels |
+| `az_overlap` | `400` pixels |
+
+Final command:
+
+```bash
+mt_prep_snap yyyymmdd datadir 0.45 5 2 800 400
+```
+
+> **Note:** The example candidate count of `6,208,229` was estimated using `da_thresh = 0.4`, while the final example uses `da_thresh = 0.45`. Because `0.45` is less restrictive than `0.4`, the final number of candidate pixels may be higher.
+---
 
 ## Further reading
 
