@@ -162,6 +162,18 @@ def fix_stamps_csv(input_path, output_path):
         print("  Warning: unknown format, saving as-is (junk row still removed).")
         df.to_csv(output_path, index=False)
 
+
+  
+    # -------------------------------------------------------
+    # Save separate velocity CSV using first three columns
+    # -------------------------------------------------------
+    df_new = df[['longitude', 'latitude', 'velocity']]
+
+    vel_output_path = os.path.splitext(output_path)[0] + '_vel.csv'
+    df_new.to_csv(vel_output_path, index=False)
+
+    print(f"  Velocity CSV saved to: {vel_output_path}")
+
     print(f"\nDone! Saved to: {output_path}")
     print(f"  Total PS points: {len(df)}")
     print(f"  Final columns:   {list(df.columns)}")

@@ -37,6 +37,11 @@ fprintf(' insar_time_ps: running steps %d to %d\n', startStep, endStep);
 fprintf('========================================\n');
 
 % -------------------------------------------------------------------------
+% --- Pre-flight: validate pscands.1.ij / .ll / .hgt before any stamps()
+% -------------------------------------------------------------------------
+validate_pscands_files(startStep);
+
+% -------------------------------------------------------------------------
 % --- Initialize Timers
 % -------------------------------------------------------------------------
 totalStart = tic;
@@ -177,6 +182,167 @@ end % function insar_time_ps
 % =========================================================================
 % --- Local Helper Functions
 % =========================================================================
+
+function validate_pscands_files(startStep)
+%VALIDATE_PSCANDS_FILES  Check pscands.1.ij / .ll / .hgt before stamps().
+%
+%   For each PATCH_* (or cwd if no patches):
+%     - files exist and are non-empty (size > 0)
+%     - n_ij == n_ll == n_hgt
+%       n_ij  = number of lines in pscands.1.ij
+%       n_ll  = filesize(pscands.1.ll)  / 8   (2 float32)
+%       n_hgt = filesize(pscands.1.hgt) / 4   (1 float32)
+%
+%   Aborts with a clear error if anything fails. Required when startStep==1;
+%   for later restarts, skips quietly if no pscands files are present.
+
+    fprintf('\n--- Pre-flight: pscands file validation ---\n');
+
+    patchDirs = discover_patch_dirs();
+    if isempty(patchDirs)
+        if startStep == 1
+            error(['insar_time_ps: no PATCH_* directories and no pscands.1.ij in %s.\n' ...
+                   'Run mt_prep / Step 11–12 first.'], pwd);
+        end
+        fprintf('  No PATCH_*/pscands found — skipping validation (startStep=%d).\n', startStep);
+        return;
+    end
+
+    nFail = 0;
+    for k = 1:numel(patchDirs)
+        pdir = patchDirs{k};
+        [ok, msg] = check_one_patch_pscands(pdir);
+        if ok
+            fprintf('  OK  %s: %s\n', pdir, msg);
+        else
+            fprintf(2, '  FAIL %s: %s\n', pdir, msg);
+            nFail = nFail + 1;
+        end
+    end
+
+    if nFail > 0
+        error(['insar_time_ps: pscands validation failed in %d location(s).\n' ...
+               '  Fix: ensure dem.grd covers the swath, re-run Step 12\n' ...
+               '  (fix_pscands_SM.sh) or regenerate heights so\n' ...
+               '  ij == ll == hgt counts, then re-run insar_time_ps.'], nFail);
+    end
+
+    fprintf('  All %d location(s) passed (ij == ll == hgt, non-empty).\n', numel(patchDirs));
+    fprintf('--------------------------------------------\n');
+end
+
+function patchDirs = discover_patch_dirs()
+% Prefer patch.list; else PATCH_* dirs; else cwd if it has pscands.1.ij.
+    patchDirs = {};
+
+    if exist('patch.list', 'file')
+        fid = fopen('patch.list', 'r');
+        if fid >= 0
+            while true
+                line = fgetl(fid);
+                if ~ischar(line), break; end
+                line = strtrim(line);
+                if isempty(line), continue; end
+                if exist(line, 'dir')
+                    patchDirs{end+1} = line; %#ok<AGROW>
+                end
+            end
+            fclose(fid);
+        end
+    end
+
+    if isempty(patchDirs)
+        d = dir('PATCH_*');
+        names = {d([d.isdir]).name};
+        if ~isempty(names)
+            % natural-ish sort: PATCH_1, PATCH_2, ...
+            [~, ix] = sort(names);
+            patchDirs = names(ix);
+        end
+    end
+
+    if isempty(patchDirs) && exist('pscands.1.ij', 'file')
+        patchDirs = {'.'};
+    end
+end
+
+function [ok, msg] = check_one_patch_pscands(pdir)
+% Check one directory for consistent, non-empty pscands files.
+    ijFile  = fullfile(pdir, 'pscands.1.ij');
+    llFile  = fullfile(pdir, 'pscands.1.ll');
+    hgtFile = fullfile(pdir, 'pscands.1.hgt');
+
+    missing = {};
+    if ~exist(ijFile,  'file'), missing{end+1} = 'pscands.1.ij';  end %#ok<AGROW>
+    if ~exist(llFile,  'file'), missing{end+1} = 'pscands.1.ll';  end %#ok<AGROW>
+    if ~exist(hgtFile, 'file'), missing{end+1} = 'pscands.1.hgt'; end %#ok<AGROW>
+    if ~isempty(missing)
+        ok = false;
+        msg = sprintf('missing: %s', strjoin(missing, ', '));
+        return;
+    end
+
+    ijInfo  = dir(ijFile);
+    llInfo  = dir(llFile);
+    hgtInfo = dir(hgtFile);
+
+    zero = {};
+    if ijInfo.bytes  == 0, zero{end+1} = 'pscands.1.ij (0 bytes)';  end %#ok<AGROW>
+    if llInfo.bytes  == 0, zero{end+1} = 'pscands.1.ll (0 bytes)';  end %#ok<AGROW>
+    if hgtInfo.bytes == 0, zero{end+1} = 'pscands.1.hgt (0 bytes)'; end %#ok<AGROW>
+    if ~isempty(zero)
+        ok = false;
+        msg = sprintf('empty file(s): %s', strjoin(zero, ', '));
+        return;
+    end
+
+    if mod(llInfo.bytes, 8) ~= 0
+        ok = false;
+        msg = sprintf('pscands.1.ll size %d not divisible by 8', llInfo.bytes);
+        return;
+    end
+    if mod(hgtInfo.bytes, 4) ~= 0
+        ok = false;
+        msg = sprintf('pscands.1.hgt size %d not divisible by 4', hgtInfo.bytes);
+        return;
+    end
+
+    n_ij  = count_text_lines(ijFile);
+    n_ll  = llInfo.bytes  / 8;
+    n_hgt = hgtInfo.bytes / 4;
+
+    if n_ij <= 0
+        ok = false;
+        msg = 'pscands.1.ij has 0 lines';
+        return;
+    end
+
+    if n_ij == n_ll && n_ll == n_hgt
+        ok = true;
+        msg = sprintf('ij=%d  ll=%d  hgt=%d', n_ij, n_ll, n_hgt);
+    else
+        ok = false;
+        msg = sprintf('count mismatch: ij=%d  ll=%d  hgt=%d', n_ij, n_ll, n_hgt);
+    end
+end
+
+function n = count_text_lines(fpath)
+% Count non-empty lines (equivalent to wc -l for typical pscands.1.ij).
+    fid = fopen(fpath, 'r');
+    if fid < 0
+        n = -1;
+        return;
+    end
+    n = 0;
+    while true
+        line = fgetl(fid);
+        if ~ischar(line), break; end
+        if ~isempty(strtrim(line))
+            n = n + 1;
+        end
+    end
+    fclose(fid);
+end
 
 function run_step(s, label, totalStart, ~)
 % Runs stamps(s,s) and prints timing. stepTimes updated in caller.

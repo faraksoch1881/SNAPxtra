@@ -63,6 +63,8 @@ class SnapxtraCoreMixin:
             print(f"  Master date will be auto-detected during baseline creation")
         
         self.swaths_to_process = self.parse_swath_option()
+        if not self.swaths_to_process:
+            print("  Swath is blank; Step 1 will set it from clip_roi (burst_check=true)")
         
         self.sbas_pairs = []
         self.master_second_pairs = []
@@ -432,9 +434,23 @@ class SnapxtraCoreMixin:
                 self._session_log_file.write('\n')
                 self._session_log_file.flush()
     
+    def _swath_config_blank(self):
+        swath_raw = self.config.get('swath', '')
+        if swath_raw is None:
+            return True
+        if isinstance(swath_raw, str) and not swath_raw.strip():
+            return True
+        return False
+
     def parse_swath_option(self):
-        swath_raw = self.config['swath']
-        
+        swath_raw = self.config.get('swath', '')
+        if self._swath_config_blank():
+            if self.config.get('burst_check', True):
+                return []
+            raise ValueError(
+                "swath is blank. Set swath (1, 2, 3, 12, 23, or 0), "
+                "or set burst_check=true with clip_roi so Step 1 can detect it."
+            )
 
         if isinstance(swath_raw, str) and ',' in swath_raw:
 
@@ -460,8 +476,12 @@ class SnapxtraCoreMixin:
             raise ValueError(f"Invalid swath option: {swath_raw}")
     
     def get_swath_config_value(self):
-        swath_raw = self.config['swath']
-        
+        swath_raw = self.config.get('swath', '')
+        if self._swath_config_blank():
+            raise ValueError(
+                "swath is blank. Run Step 1 with burst_check=true and clip_roi, "
+                "or set swath in the config."
+            )
 
         if isinstance(swath_raw, str) and ',' in swath_raw:
 

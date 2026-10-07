@@ -127,6 +127,10 @@ class RunnerMixin:
                     step_num, step_elapsed, self._batch_wall_elapsed_sec())
                 print(f"\n✗ Step {step_num} failed!")
                 return False
+
+            if step_num == 13 and not self._run_phase_unw_preview():
+                print(f"\n✗ Step {step_num} phase preview failed!")
+                return False
             
             self._log_step_timing_batch(
                 step_num, step_elapsed, self._batch_wall_elapsed_sec())
@@ -203,6 +207,9 @@ class RunnerMixin:
         step_ok = step_func()
         self._release_progress_finish_step()
         self._log_step_timing_single(step_num, time.perf_counter() - step_start)
+        if step_ok and step_num == 13 and not self._run_phase_unw_preview():
+            print(f"\n✗ Step {step_num} phase preview failed!")
+            return False
         return step_ok
 
 

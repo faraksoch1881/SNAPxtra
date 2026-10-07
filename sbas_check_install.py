@@ -67,34 +67,43 @@ PYTHON_REQUIRED_MODULES = {
 
 MAX_INSTALL_ATTEMPTS = 3
 
-# ANSI color codes
-class Colors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+COL_MODULE = 25
+COL_VERSION = 20
+COL_STATUS = 10
+
 
 def print_header(text):
-    print(f"\n{Colors.HEADER}{Colors.BOLD}{'='*70}{Colors.ENDC}")
-    print(f"{Colors.HEADER}{Colors.BOLD}{text:^70}{Colors.ENDC}")
-    print(f"{Colors.HEADER}{Colors.BOLD}{'='*70}{Colors.ENDC}\n")
+    print(f"\n>{text}")
+
 
 def print_success(text):
-    print(f"{Colors.OKGREEN}✓ {text}{Colors.ENDC}")
+    print(f" ✓ {text}")
+
 
 def print_fail(text):
-    print(f"{Colors.FAIL}✗ {text}{Colors.ENDC}")
+    print(f" ✗ {text}")
+
 
 def print_warning(text):
-    print(f"{Colors.WARNING}⚠ {text}{Colors.ENDC}")
+    print(f" ! {text}")
+
 
 def print_info(text):
-    print(f"{Colors.OKCYAN}ℹ {text}{Colors.ENDC}")
+    print(f" {text}")
+
+
+def print_module_table(rows):
+    """Print Module / Version / Status table (plain text, no colors)."""
+    header = f"{'Module':<{COL_MODULE}}{'Version':<{COL_VERSION}}{'Status':<{COL_STATUS}}"
+    sep = '-' * (COL_MODULE + COL_VERSION + COL_STATUS)
+    print(header)
+    print(sep)
+    for name, version, ok in rows:
+        status = '✓ OK' if ok else '✗ Missing'
+        ver = version if version else 'N/A'
+        print(f"{name:<{COL_MODULE}}{ver:<{COL_VERSION}}{status:<{COL_STATUS}}")
+    print()
+
 
 def read_config(config_file):
     """Read configuration file and extract parameters."""
@@ -173,8 +182,8 @@ def is_mamba_available():
 def install_conda_packages(packages):
     if not packages:
         return True
+    print_info(f"Conda: {packages}")
     solver = 'mamba' if is_mamba_available() else 'conda'
-    print_info(f"Installing with {solver}: {' '.join(packages)}")
     return subprocess.run(
         [solver, 'install', '-y', '-c', 'conda-forge'] + packages,
         check=False,
@@ -183,7 +192,7 @@ def install_conda_packages(packages):
 def install_pip_packages(packages):
     if not packages:
         return True
-    print_info(f"Installing with pip: {' '.join(packages)}")
+    print_info(f"Pip: {packages}")
     return subprocess.run(
         [sys.executable, '-m', 'pip', 'install'] + packages,
         check=False,
@@ -202,21 +211,12 @@ def install_python_modules(missing_modules, auto_install=False):
     if not missing_modules:
         return True
 
-    print_header("Python Package Installation")
-    print_info(f"Missing modules: {', '.join(missing_modules)}")
-
-    if not auto_install:
-        choice = input("\nInstall missing Python packages now? [Y/n]: ").strip().lower()
-        if choice not in ('', 'y', 'yes'):
-            print_warning("Skipping automatic Python package installation.")
-            return False
-
     remaining = list(missing_modules)
     for attempt in range(1, MAX_INSTALL_ATTEMPTS + 1):
         if not remaining:
             break
 
-        print_info(f"Install attempt {attempt}/{MAX_INSTALL_ATTEMPTS}")
+        print(f"\n? Attempt {attempt} of {MAX_INSTALL_ATTEMPTS} to install missing modules.")
 
         conda_packages = sorted({
             CONDA_NAME_MAP[m] for m in remaining if CONDA_NAME_MAP.get(m, m) in CONDA_PREFERRED
@@ -225,6 +225,17 @@ def install_python_modules(missing_modules, auto_install=False):
             PIP_NAME_MAP[m] for m in remaining
             if CONDA_NAME_MAP.get(m, m) not in CONDA_PREFERRED
         })
+
+        if conda_packages:
+            print_info(f"Conda: {conda_packages}")
+        if pip_packages:
+            print_info(f"Pip: {pip_packages}")
+
+        if not auto_install and attempt == 1:
+            choice = input("\nInstall missing modules now? [Y/n]: ").strip().lower()
+            if choice not in ('', 'y', 'yes'):
+                print_warning("Skipping automatic Python package installation.")
+                return False
 
         if conda_packages and is_conda_installed():
             install_conda_packages(conda_packages)
@@ -279,7 +290,7 @@ def install_python_modules(missing_modules, auto_install=False):
 
 def check_snap_installation(config):
     """Check SNAP installation and GPT availability from config."""
-    print_header("SNAP/GPT Installation Check")
+    print_header("Checking SNAP/GPT:")
     
     snap_found = False
     gpt_path = config.get('gpt_loc')
@@ -324,7 +335,7 @@ def check_snap_installation(config):
 
 def check_snaphu_installation(config):
     """Check SNAPHU installation from config (snaphu_bin or snaphu_install)."""
-    print_header("SNAPHU Installation Check")
+    print_header("Checking SNAPHU:")
     
     snaphu_path = config.get('snaphu_bin')
     
@@ -373,26 +384,21 @@ def check_snaphu_installation(config):
 
 def check_graph_files(config):
     """Check required XML graph files from config graph_path."""
-    print_header("SNAP Graph XML Files Check")
+    print_header("Checking SNAP Graph XML files:")
     
     graph_path = config.get('graph_path') 
-    print('Graph Path:')
-    print(graph_path)
+    print_info(f"Graph path: {graph_path}")
     
     if not graph_path:
         print_fail("graph_path not specified in config file")
         print_info("Add graph_path=/path/to/multi_graphs in config")
         return False
     
-    print_info(f"Checking graph directory: {graph_path}")
-    
     if not os.path.isdir(graph_path):
         print_fail(f"Graph directory not found: {graph_path}")
         return False
     
     print_success(f"Graph directory exists: {graph_path}")
-    
-
 
     required_xmls = [
         '02_backgeo_esd.xml',
@@ -413,25 +419,26 @@ def check_graph_files(config):
         'subset_intf.xml',
     ]
 
+    rows = []
     all_found = True
-    print(f"\n{Colors.BOLD}Required XML files ({len(required_xmls)}):{Colors.ENDC}")
-    
     for xml_file in required_xmls:
         xml_path = os.path.join(graph_path, xml_file)
-        if os.path.exists(xml_path):
-            print_success(f"{xml_file}")
-        else:
-            print_fail(f"{xml_file} - NOT FOUND")
+        ok = os.path.exists(xml_path)
+        if not ok:
             all_found = False
+        rows.append((xml_file, 'present' if ok else 'N/A', ok))
+
+    print()
+    print_module_table(rows)
     
     try:
         all_xmls = sorted([f for f in os.listdir(graph_path) if f.endswith('.xml')])
         extra_xmls = [x for x in all_xmls if x not in required_xmls]
         
         if extra_xmls:
-            print(f"\n{Colors.BOLD}Present but not used by ps_sbas_snapxtra.py:{Colors.ENDC}")
+            print_info("Present but not used by ps_sbas_snapxtra.py:")
             for xml_file in extra_xmls:
-                print_info(f"{xml_file}")
+                print_info(f"  {xml_file}")
     except OSError:
         pass
     
@@ -439,7 +446,7 @@ def check_graph_files(config):
 
 def check_local_scripts():
     """Check companion Python scripts in the same directory."""
-    print_header("Local Script Files Check")
+    print_header("Checking local script files:")
     
     script_dir = Path(__file__).resolve().parent
     required_scripts = [
@@ -447,39 +454,49 @@ def check_local_scripts():
         'lib/sbas_pair_builder.py',
     ]
     
+    rows = []
     all_ok = True
     for name in required_scripts:
         path = script_dir / name
-        if path.is_file():
-            print_success(f"{name}")
-        else:
-            print_fail(f"{name} - NOT FOUND in {script_dir}")
+        ok = path.is_file()
+        if not ok:
             all_ok = False
+        rows.append((name, 'present' if ok else 'N/A', ok))
+
+    print()
+    print_module_table(rows)
     
     return all_ok
 
 def check_python_dependencies(auto_install=False):
     """Check Python module dependencies used by ps_sbas_snapxtra.py."""
-    print_header("Python Dependencies Check")
+    print_header("Checking required modules:")
     
-    all_ok = True
-    missing_required = get_missing_python_modules(PYTHON_REQUIRED_MODULES)
-    
-    print(f"{Colors.BOLD}Required Modules:{Colors.ENDC}")
+    rows = []
     for module_name, import_name in PYTHON_REQUIRED_MODULES.items():
         available, version = check_python_module(module_name, import_name)
-        if available:
-            print_success(f"{module_name}: {version}")
-        else:
-            print_fail(f"{module_name}: NOT FOUND")
-            all_ok = False
+        rows.append((module_name, version if available else 'N/A', available))
+
+    print()
+    print_module_table(rows)
+
+    missing_required = get_missing_python_modules(PYTHON_REQUIRED_MODULES)
+    all_ok = not missing_required
     
     if missing_required:
         installed = install_python_modules(missing_required, auto_install=auto_install)
+        # Re-print table after install attempts
+        rows = []
+        for module_name, import_name in PYTHON_REQUIRED_MODULES.items():
+            available, version = check_python_module(module_name, import_name)
+            rows.append((module_name, version if available else 'N/A', available))
+        print_header("Checking required modules (after install):")
+        print()
+        print_module_table(rows)
         missing_required = get_missing_python_modules(PYTHON_REQUIRED_MODULES)
         all_ok = not missing_required and installed
     elif not all_ok:
-        print_info("\nInstall missing modules:")
+        print_info("Install missing modules:")
         print_info("  conda install -c conda-forge numpy shapely matplotlib gdal psutil rasterio scipy")
         print_info("  OR")
         print_info("  pip install numpy shapely matplotlib gdal psutil rasterio scipy")
@@ -488,7 +505,7 @@ def check_python_dependencies(auto_install=False):
 
 def check_system_utilities(auto_install=False):
     """Check required system utilities."""
-    print_header("System Utilities Check")
+    print_header("Checking system utilities:")
     
     required_utils = ['bc', 'awk', 'sed', 'gdal_translate', 'gdalinfo']
     optional_utils = ['wget', 'curl', 'gmt', 'gdal_edit.py']
@@ -496,21 +513,28 @@ def check_system_utilities(auto_install=False):
     all_ok = True
     missing_required = []
     
-    print(f"{Colors.BOLD}Required Utilities:{Colors.ENDC}")
+    rows = []
     for util in required_utils:
         if is_command_available(util):
-            print_success(f"{util}: {shutil.which(util)}")
+            rows.append((util, shutil.which(util) or 'found', True))
         else:
-            print_fail(f"{util}: NOT FOUND")
+            rows.append((util, 'N/A', False))
             missing_required.append(util)
             all_ok = False
-    
-    print(f"\n{Colors.BOLD}Optional Utilities:{Colors.ENDC}")
+
+    print()
+    print_info("Required:")
+    print_module_table(rows)
+
+    opt_rows = []
     for util in optional_utils:
         if is_command_available(util):
-            print_success(f"{util}: {shutil.which(util)}")
+            opt_rows.append((util, shutil.which(util) or 'found', True))
         else:
-            print_warning(f"{util}: NOT FOUND (optional)")
+            opt_rows.append((util, 'N/A', False))
+
+    print_info("Optional:")
+    print_module_table(opt_rows)
     
     gdal_utils_missing = [u for u in missing_required if u.startswith('gdal')]
     if gdal_utils_missing and auto_install and is_conda_installed():
@@ -528,7 +552,7 @@ def check_system_utilities(auto_install=False):
 
 def check_disk_space():
     """Check available disk space."""
-    print_header("Disk Space Check")
+    print_header("Checking disk space:")
     
     try:
         stat = os.statvfs(os.getcwd())
@@ -549,7 +573,7 @@ def check_disk_space():
 
 def print_installation_guide(results):
     """Print installation guide based on detected OS and missing components."""
-    print_header("Installation Guide")
+    print_header("Installation guide:")
     
     os_type = platform.system()
     missing_components = [k for k, v in results.items() if not v]
@@ -559,62 +583,62 @@ def print_installation_guide(results):
     
     if os_type == "Linux":
         distro = platform.freedesktop_os_release().get('ID', 'linux')
-        print(f"{Colors.BOLD}For {distro.capitalize()}:{Colors.ENDC}\n")
+        print_info(f"For {distro.capitalize()}:")
         
         step = 1
         
         # Only show SNAP installation if it's missing
         if not results.get('snap', True):
-            print(f"{Colors.BOLD}{step}. Install SNAP:{Colors.ENDC}")
-            print("   Download: http://step.esa.int/main/download/snap-download/")
-            print("   chmod +x esa-snap_sentinel_unix_*.sh")
-            print("   ./esa-snap_sentinel_unix_*.sh")
+            print_info(f"{step}. Install SNAP:")
+            print_info("   Download: http://step.esa.int/main/download/snap-download/")
+            print_info("   chmod +x esa-snap_sentinel_unix_*.sh")
+            print_info("   ./esa-snap_sentinel_unix_*.sh")
             print()
             step += 1
         
         # Only show Python dependencies if they're missing
         if not results.get('python_modules', True):
-            print(f"{Colors.BOLD}{step}. Install Python dependencies (Conda - RECOMMENDED):{Colors.ENDC}")
-            print("   conda env create -f sbas_environment.yml")
-            print("   conda activate sbas")
+            print_info(f"{step}. Install Python dependencies (Conda - RECOMMENDED):")
+            print_info("   conda env create -f sbas_environment.yml")
+            print_info("   conda activate sbas")
             print()
             step += 1
         
         # Only show SNAPHU installation if it's missing
         if not results.get('snaphu', True):
-            print(f"{Colors.BOLD}{step}. Install SNAPHU:{Colors.ENDC}")
-            print("   wget https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/snaphu-v2.0.5.tar.gz")
-            print("   tar -xzf snaphu-v2.0.5.tar.gz")
-            print("   cd snaphu-v2.0.5/src")
-            print("   make")
-            print("   sudo cp snaphu /usr/local/bin/")
+            print_info(f"{step}. Install SNAPHU:")
+            print_info("   wget https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/snaphu-v2.0.5.tar.gz")
+            print_info("   tar -xzf snaphu-v2.0.5.tar.gz")
+            print_info("   cd snaphu-v2.0.5/src")
+            print_info("   make")
+            print_info("   sudo cp snaphu /usr/local/bin/")
             print()
             step += 1
         
     elif os_type == "Darwin":
-        print(f"{Colors.BOLD}For macOS:{Colors.ENDC}\n")
+        print_info("For macOS:")
         step = 1
         if not results.get('snap', True):
-            print(f"{step}. Install SNAP from: http://step.esa.int/main/download/snap-download/")
+            print_info(f"{step}. Install SNAP from: http://step.esa.int/main/download/snap-download/")
             step += 1
         if not results.get('python_modules', True):
-            print(f"{step}. conda env create -f sbas_environment.yml")
+            print_info(f"{step}. conda env create -f sbas_environment.yml")
             step += 1
         if not results.get('snaphu', True):
-            print(f"{step}. Install SNAPHU (compile from source)")
+            print_info(f"{step}. Install SNAPHU (compile from source)")
             step += 1
         
     elif os_type == "Windows":
-        print(f"{Colors.BOLD}For Windows:{Colors.ENDC}\n")
+        print_info("For Windows:")
         step = 1
         if not results.get('snap', True):
-            print(f"{step}. Install SNAP from: http://step.esa.int/main/download/snap-download/")
+            print_info(f"{step}. Install SNAP from: http://step.esa.int/main/download/snap-download/")
             step += 1
         if not results.get('python_modules', True):
-            print(f"{step}. conda env create -f sbas_environment.yml")
+            print_info(f"{step}. conda env create -f sbas_environment.yml")
             step += 1
         if not results.get('snaphu', True):
-            print(f"{step}. Use WSL or Linux for SNAPHU")
+            print_info(f"{step}. Use WSL or Linux for SNAPHU")
             step += 1
     
     print()
@@ -638,17 +662,15 @@ def main():
     auto_install = args.yes
     
     if not os.path.exists(config_file):
-        print(f"{Colors.FAIL}Error: Config file not found: {config_file}{Colors.ENDC}")
+        print_fail(f"Error: Config file not found: {config_file}")
         return 1
     
-    print(f"\n{Colors.HEADER}{Colors.BOLD}{'='*70}")
-    print(f"SBAS InSAR Processing - Dependency Check")
-    print(f"Config: {config_file}")
-    print(f"Python: {sys.version.split()[0]}")
-    print(f"Platform: {platform.system()} {platform.release()}")
+    print(f"\n>SBAS InSAR Processing - Dependency Check")
+    print_info(f"Config: {config_file}")
+    print_info(f"Python: {sys.version.split()[0]}")
+    print_info(f"Platform: {platform.system()} {platform.release()}")
     if auto_install:
-        print(f"Auto-install: enabled")
-    print(f"{'='*70}{Colors.ENDC}\n")
+        print_info("Auto-install: enabled")
     
     # Read config
     print_info(f"Reading configuration from: {config_file}")
@@ -657,7 +679,7 @@ def main():
     if config is None:
         return 1
     
-    print_success(f"Config loaded: {len(config)} parameters found\n")
+    print_success(f"Config loaded: {len(config)} parameters found")
     
     results = {}
     
@@ -683,10 +705,10 @@ def main():
     results['disk'] = check_disk_space()
     
     # Print summary
-    print_header("Summary")
+    print_header("Summary:")
     
     if all(results.values()):
-        print_success("All dependencies satisfied! ✓")
+        print_success("All dependencies satisfied.")
         print_info("Your system is ready for SBAS processing.")
     else:
         print_warning("Some dependencies are missing.")

@@ -271,7 +271,7 @@ class AoiMixin:
 
         date_groups = self.get_zip_date_groups()
         if not date_groups:
-            print("  ⚠ No ZIP files found for AOI check")
+            print("  ⚠ No .zip or .SAFE products found for AOI check")
             return []
         
         first_date = sorted(date_groups.keys())[0]
@@ -1239,16 +1239,55 @@ class AoiMixin:
         return (detected_swaths, detected_l_bursts, detected_u_bursts, temp_dims)
 
 
+    def prefer_safe_product(self, product_path):
+        """Use a matching .SAFE directory for slice assembly when one exists."""
+        path = str(product_path).rstrip(os.sep)
+        if path.endswith('.SAFE') and os.path.isdir(path):
+            return path
+        stem = self._product_key(path)
+        parent = os.path.dirname(path)
+        for cand in (
+            os.path.join(parent, stem + '.SAFE'),
+            os.path.join(os.path.dirname(parent), stem + '.SAFE'),
+        ):
+            if os.path.isdir(cand):
+                return cand
+        return path
+
+    def _product_key(self, product_path):
+        """Stem shared by product.zip and product.SAFE (also .../product.SAFE/manifest.safe)."""
+        path = str(product_path).rstrip(os.sep)
+        base = os.path.basename(path)
+        if base.lower() == 'manifest.safe':
+            base = os.path.basename(os.path.dirname(path))
+        for suf in ('.zip', '.SAFE', '.safe'):
+            if base.endswith(suf):
+                return base[:-len(suf)]
+        return base
+
     def get_zip_files(self, silent=False):
-        zip_pattern = os.path.join(self.config['input_data'], '*.zip')
-        zip_files = sorted(glob.glob(zip_pattern))
-        
-        if not zip_files:
-            raise FileNotFoundError(f"No .zip files found in {self.config['input_data']}")
-        
+        """Products in input_data. Prefer a .SAFE directory over the matching .zip."""
+        input_dir = self.config['input_data']
+        zips = sorted(glob.glob(os.path.join(input_dir, '*.zip')))
+        safes = sorted(
+            p for p in glob.glob(os.path.join(input_dir, '*.SAFE'))
+            if os.path.isdir(p)
+        )
+        by_key = {}
+        for path in zips:
+            by_key[self._product_key(path)] = path
+        for path in safes:
+            by_key[self._product_key(path)] = path
+        products = [by_key[k] for k in sorted(by_key)]
+        if not products:
+            raise FileNotFoundError(
+                f"No .zip files or .SAFE directories found in {input_dir}"
+            )
         if not silent:
-            print(f"\nFound {len(zip_files)} .zip files")
-        return zip_files
+            n_safe = sum(1 for p in products if p.endswith('.SAFE'))
+            n_zip = len(products) - n_safe
+            print(f"\nFound {len(products)} products ({n_safe} .SAFE, {n_zip} .zip)")
+        return products
 
     def get_zip_date_groups(self):
         """Group zip files by acquisition date."""
@@ -1288,7 +1327,10 @@ class AoiMixin:
         return unique_zips
     
     def extract_date_from_zip(self, zip_path):
-        basename = os.path.basename(zip_path)
+        path = str(zip_path).rstrip(os.sep)
+        basename = os.path.basename(path)
+        if basename.lower() == 'manifest.safe':
+            basename = os.path.basename(os.path.dirname(path))
         parts = basename.split('_')
         
         if len(parts) >= 6:
@@ -1580,7 +1622,7 @@ class AoiMixin:
                     break
             
             if not master_zip_found:
-                raise FileNotFoundError(f"Cannot find .zip file for master date {self.master_date}")
+                raise FileNotFoundError(f"Cannot find .zip or .SAFE product for master date {self.master_date}")
             
             print(f"  Master zip: {os.path.basename(self.master_zip)}")
             print(f"  ✓ Step 00 complete\n")
@@ -1692,10 +1734,13 @@ class AoiMixin:
         return True
 
     def get_backgeo_dem_model(self):
-        """DEM name for SNAP BackGeo / merge_addband_mswath graphs (-Pdem_name_model)."""
-        dem_raw = self.config.get('dem_name')
+        """Resolve DEM name from config for SNAP ops (-PdemName / -Pdem_name_model).
+
+        Prefers ``demName``, then ``dem_name``. Empty or missing → Copernicus 30m Global DEM.
+        """
+        dem_raw = self.config.get('demName')
         if dem_raw is None or str(dem_raw).strip() == '':
-            dem_raw = self.config.get('demName')
+            dem_raw = self.config.get('dem_name')
         dem_model = str(dem_raw).strip() if dem_raw is not None else ''
         if not dem_model:
             dem_model = 'Copernicus 30m Global DEM'
@@ -2075,14 +2120,16 @@ class AoiMixin:
                         )
                 
                 frame_params = self.assign_frames_by_time(files, swaths_list, l_bursts_list, u_bursts_list)
+                file1 = self.prefer_safe_product(frame_params['file1'])
+                file2 = self.prefer_safe_product(frame_params['file2'])
                 
                 graph_file = self.get_graph_file('slice_assembly.xml')
                 polarization = self.config.get('polarization', 'VV')
                 cmd = [
                     *self.gpt_base_cmd(),
                     graph_file,
-                    f"-Pfile1={frame_params['file1']}",
-                    f"-Pfile2={frame_params['file2']}",
+                    f"-Pfile1={file1}",
+                    f"-Pfile2={file2}",
                     f"-Pswath_type1={frame_params['swath_type1']}",
                     f"-Pl_burst1={frame_params['l_burst1']}",
                     f"-Pu_burst1={frame_params['u_burst1']}",
@@ -2095,8 +2142,8 @@ class AoiMixin:
                 desc = f"SliceAssemblyMultiFrame {date}"
                 
                 print(f"  Multi-frame processing (time-based ordering):")
-                print(f"    File1 (earliest): {os.path.basename(frame_params['file1'])} → {frame_params['swath_type1']} bursts {frame_params['l_burst1']}-{frame_params['u_burst1']}")
-                print(f"    File2 (later):    {os.path.basename(frame_params['file2'])} → {frame_params['swath_type2']} bursts {frame_params['l_burst2']}-{frame_params['u_burst2']}")
+                print(f"    File1 (earliest): {os.path.basename(file1)} → {frame_params['swath_type1']} bursts {frame_params['l_burst1']}-{frame_params['u_burst1']}")
+                print(f"    File2 (later):    {os.path.basename(file2)} → {frame_params['swath_type2']} bursts {frame_params['l_burst2']}-{frame_params['u_burst2']}")
             else:
                 if self.config.get('burst_check', True):
                     graph_file = self.get_graph_file('single_slice.xml')

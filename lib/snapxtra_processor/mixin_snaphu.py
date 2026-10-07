@@ -1868,6 +1868,9 @@ class SnaphuMixin:
         print(f"\n{'='*80}")
         print(f"STEP 23: Terrain-Correction")
         print(f"{'='*80}")
+
+        dem_name_tc = self.get_backgeo_dem_model()
+        print(f"  Terrain-Correction DEM (-PdemName): {dem_name_tc}")
         
         if not self.sbas_pairs:
             if not self.load_sbas_pairs():
@@ -2009,7 +2012,7 @@ class SnaphuMixin:
                         'Terrain-Correction',
                         f"-Ssource={input_file}",
                         f"-PsourceBands={source_bands_param}",
-                        "-PdemName=SRTM 3Sec",
+                        f"-PdemName={dem_name_tc}",
                         "-PpixelSpacingInDegree=0.00099999921",
                         "-PimgResamplingMethod=BILINEAR_INTERPOLATION",
                         "-PsaveLocalIncidenceAngle=true",

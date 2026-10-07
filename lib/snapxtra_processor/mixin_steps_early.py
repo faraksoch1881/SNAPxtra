@@ -78,14 +78,16 @@ class StepsEarlyMixin:
                     )
                 
                 frame_params = self.assign_frames_by_time(files, swaths_list, l_bursts_list, u_bursts_list)
+                file1 = self.prefer_safe_product(frame_params['file1'])
+                file2 = self.prefer_safe_product(frame_params['file2'])
                 
                 graph_file = self.get_graph_file('slice_assembly.xml')
                 polarization = self.config.get('polarization', 'VV')
                 cmd = [
                     *self.gpt_base_cmd(),
                     graph_file,
-                    f"-Pfile1={frame_params['file1']}",
-                    f"-Pfile2={frame_params['file2']}",
+                    f"-Pfile1={file1}",
+                    f"-Pfile2={file2}",
                     f"-Pswath_type1={frame_params['swath_type1']}",
                     f"-Pl_burst1={frame_params['l_burst1']}",
                     f"-Pu_burst1={frame_params['u_burst1']}",
@@ -401,7 +403,7 @@ class StepsEarlyMixin:
         print(f"STEP 6: Add Elevation")
         print(f"{'='*80}")
         
-        dem_name = self.config.get('demName', 'Copernicus 30m Global DEM').strip()
+        dem_name = self.get_backgeo_dem_model()
         external_dem = self.config.get('externalDEMFile', '').strip()
         
         if external_dem:

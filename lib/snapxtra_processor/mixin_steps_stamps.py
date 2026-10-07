@@ -201,6 +201,53 @@ class StepsStampsMixin:
         
         print(f"\n  {len(selected_pairs)} PS pairs prepared\n")
         return True
+
+    def _phase_preview_bandmath_dir(self):
+        """Bandmath tree passed to phase2png after Step 13."""
+        swath_config = self.get_swath_config_value()
+        is_multi_swath = swath_config not in [1, 2, 3]
+        ps_mode = self.insar_target == 2 and self.insar_method == 2
+        if is_multi_swath:
+            parent = os.path.join(self.proj_root, self.get_merge_folder_name(swath_config))
+            folder = (
+                f'multi_intf_deb_mrg_bandmath_ps_{self.master_date}'
+                if ps_mode
+                else f'multi_intf_deb_mrg_bandmath_sbas_{self.master_date}'
+            )
+        else:
+            parent = os.path.join(self.proj_root, self.swaths_to_process[0])
+            folder = (
+                f'multi_intf_deb_bandmath_ps_{self.master_date}'
+                if ps_mode
+                else f'multi_intf_deb_bandmath_sbas_{self.master_date}'
+            )
+        return os.path.join(parent, folder)
+
+    def _run_phase_unw_preview(self):
+        """Small JPEG phase previews in <proj_root>/phase_unw_intf. Always --size y."""
+        bandmath_dir = self._phase_preview_bandmath_dir()
+        script = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'phase2png.py',
+        )
+        out_dir = os.path.join(self.proj_root, 'phase_unw_intf')
+        os.makedirs(out_dir, exist_ok=True)
+        if not os.path.isfile(script):
+            print(f"  ✗ phase2png.py not found: {script}")
+            return False
+        if not os.path.isdir(bandmath_dir):
+            print(f"  ✗ Phase preview input not found: {bandmath_dir}")
+            return False
+        print(f"\n  Phase preview (--size y)")
+        print(f"  Input: {bandmath_dir}")
+        print(f"  Output: {out_dir}")
+        result = subprocess.run(
+            [sys.executable, script, '--dir', bandmath_dir, '--size', 'y', '--out', out_dir]
+        )
+        if result.returncode != 0:
+            print(f"  ✗ phase2png.py failed (exit {result.returncode})")
+            return False
+        return True
     
     def edit_dim_file_for_ps(self, dim_file, master_target_pairs, bands_removed):
         import xml.etree.ElementTree as ET
