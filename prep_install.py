@@ -709,7 +709,7 @@ def main():
     
     if all(results.values()):
         print_success("All dependencies satisfied.")
-        print_info("Your system is ready for SBAS processing.")
+        print_info("Your system is ready for InSAR processing.")
     else:
         print_warning("Some dependencies are missing.")
         missing = [k for k, v in results.items() if not v]
