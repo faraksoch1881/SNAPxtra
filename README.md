@@ -1,4 +1,4 @@
-# SNAPxtra  Sentinel-1 InSAR Workflow
+# SNAPxtra Sentinel-1 InSAR Workflow
 
 **SNAPxtra** builds interferometric stacks from **Sentinel-1** data using [ESA SNAP](http://step.esa.int/main/download/snap-download/), [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/), and Python automation.
 This is cross platform compatible supported by Windows, Ubuntu and Mac.
@@ -86,8 +86,8 @@ python check_install.py param_proj.config -y    # auto-install missing Python pa
 When you see:
 
 ```text
-? All dependencies satisfied!
-? Your system is ready for SBAS processing.
+OK: All dependencies satisfied!
+OK: Your system is ready for SBAS processing.
 ```
 
 you can start processing.
@@ -98,22 +98,22 @@ you can start processing.
 
 ```
 +-----------------+     +------------------+     +-----------------+
-¦ Download S1     ¦----?¦ Edit config      ¦----?¦ sbas_check_     ¦
-¦ (ASF, etc.)     ¦     ¦ param_proj.config¦     ¦ install.py      ¦
+| Download S1     |---->| Edit config      |---->| sbas_check_     |
+| (ASF, etc.)     |     | param_proj.config|     | install.py      |
 +-----------------+     +------------------+     +-----------------+
-                                                          ¦
-                        +------------------+              ?
-                        ¦ Step 0: baselines¦?--- python ps_sbas_snapxtra.py config baselines
-                        ¦ sbas_pairs.txt   ¦
+                                                          |
+                        +------------------+              v
+                        | Step 0: baselines|--> python ps_sbas_snapxtra.py config baselines
+                        | sbas_pairs.txt   |
                         +------------------+
-                                 ¦
-                        +--------?---------+
-                        ¦ Batch or step    ¦
-                        ¦ processing       ¦
+                                 |
                         +------------------+
-                                 ¦
+                        | Batch or step    |
+                        | processing       |
+                        +------------------+
+                                 |
               +------------------+------------------+
-              ?                  ?                  ?
+              v                  v                  v
          GEOC/ (LiCSBAS)   Stamps_sbas/        Stamps_ps/
 ```
 
@@ -144,29 +144,29 @@ Config files use `key=value` format (see `param_proj.config`).
 
 | Parameter | Value | Result |
 |-----------|-------|--------|
-| `insar_target` | `1` | Export for **LiCSBAS** (SBAS only) ? `GEOC/` |
-| `insar_target` | `2` | Export for **StaMPS** ? `Stamps_sbas/` or `Stamps_ps/` |
+| `insar_target` | `1` | Export for **LiCSBAS** (SBAS only) -> `GEOC/` |
+| `insar_target` | `2` | Export for **StaMPS** -> `Stamps_sbas/` or `Stamps_ps/` |
 | `insar_method` | `1` | **SBAS** network (used when `insar_target=2`) |
 | `insar_method` | `2` | **PS** star network (only when `insar_target=2`) |
 
-### Optional  quick test run
+### Optional - quick test run
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `check_only` | `false` | If `true`, processes only **3 pairs** (first, middle, last) through all steps as a dry run before the full dataset |
 
-### Optional  AOI & swath auto-detection
+### Optional - AOI & swath auto-detection
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `burst_check` | `true` | Uses AOI footprint to find swaths with overlap = `swath_threshold` |
 | `swath_threshold` | `10` | Minimum overlap (%) between AOI and swath footprint |
-| `swath` |  | IW selection (`1`, `2`, `3`, `12`, `23`, `0` = all). Auto-updated when `burst_check=true` |
-| `l_burst` / `u_burst` |  | Burst range (1-based). Auto-updated when `burst_check=true` |
+| `swath` | - | IW selection (`1`, `2`, `3`, `12`, `23`, `0` = all). Auto-updated when `burst_check=true` |
+| `l_burst` / `u_burst` | - | Burst range (1-based). Auto-updated when `burst_check=true` |
 
 When `burst_check=true`, `swath`, `l_burst`, and `u_burst` are written back to the config before processing. Set `burst_check=false` to use manual values only.
 
-### Optional  unwrap mask (vector AOI)
+### Optional - unwrap mask (vector AOI)
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -175,14 +175,14 @@ When `burst_check=true`, `swath`, `l_burst`, and `u_burst` are written back to t
 
 If `msk_shp` is empty, no vector mask is applied and the full scene is unwrapped.
 
-### Optional  DEM
+### Optional - DEM
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `demName` | `Copernicus 30m Global DEM` | Built-in DEM (`SRTM 3Sec`, etc.) when no external DEM |
 | `externalDEMFile` | *(empty)* | Path to local GeoTIFF DEM. Use with `demName=External DEM` |
 
-### Optional  master date
+### Optional - master date
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -198,9 +198,9 @@ If `msk_shp` is empty, no vector mask is applied and the full scene is unwrapped
 | `no_loop` | `1` | `1` = pair must belong to at least one triangle (phase closure) |
 | `connect_network` | `true` | Bridge disconnected network components |
 
-**`no_loop=1`**  keeps pairs that form triangles (AB, BC, AC) and critical bridge edges.
+**`no_loop=1`** - keeps pairs that form triangles (A-B, B-C, A-C) and critical bridge edges.
 
-**`connect_network=true`**  if filtering splits the network, bridging pairs connect component *i* (latest date) to component *i+1* (earliest date). Saved in `connect_sb.txt`.
+**`connect_network=true`** - if filtering splits the network, bridging pairs connect component *i* (latest date) to component *i+1* (earliest date). Saved in `connect_sb.txt`.
 
 ### Multilook & SNAPHU
 
@@ -209,8 +209,8 @@ If `msk_shp` is empty, no vector mask is applied and the full scene is unwrapped
 | `Range` | `20` | Range looks |
 | `Azimuth` | `4` | Azimuth looks |
 | `phase_coh_mask_th` | `0.1` | Pixels with coherence below this are masked before unwrap |
-| `cost_mode` | `SMOOTH` | SNAPHU cost mode (`DEFO`, `SMOOTH`, `TOPO`, ) |
-| `init_method` | `MCF` | SNAPHU init (`MCF`, `MST`, ) |
+| `cost_mode` | `SMOOTH` | SNAPHU cost mode (`DEFO`, `SMOOTH`, `TOPO`, ...) |
+| `init_method` | `MCF` | SNAPHU init (`MCF`, `MST`, ...) |
 
 ### Parallelization & GPT memory
 
@@ -226,8 +226,8 @@ If `msk_shp` is empty, no vector mask is applied and the full scene is unwrapped
 gpt -q 8 -c 16G <graph-or-operator> ...
 ```
 
-- **`-q`**  SNAP native threads **inside one** `gpt` job (jobs run **one at a time**)
-- **`-c`**  tile cache per job (must fit in available RAM)
+- **`-q`** - SNAP native threads **inside one** `gpt` job (jobs run **one at a time**)
+- **`-c`** - tile cache per job (must fit in available RAM)
 
 When `parallel=false`, jobs run sequentially without `-q`.
 
@@ -243,7 +243,7 @@ When `parallel=false`, jobs run sequentially without `-q`.
 
 ## How to run
 
-### Step 0  baselines & network (always run first)
+### Step 0 - baselines & network (always run first)
 
 ```bash
 python ps_sbas_snapxtra.py param_proj.config baselines
@@ -273,7 +273,7 @@ python ps_sbas_snapxtra.py 7 param_proj.config
 
 | Command | Behaviour |
 |---------|-----------|
-| `python ps_sbas_snapxtra.py config -s 3 -e 10` | Steps 310 (ignores config `start_step` / `end_step`) |
+| `python ps_sbas_snapxtra.py config -s 3 -e 10` | Steps 3-10 (ignores config `start_step` / `end_step`) |
 | `python ps_sbas_snapxtra.py config -s 3` | Step 3 through workflow end |
 | `python ps_sbas_snapxtra.py config` | Uses `start_step` / `end_step` from config |
 
@@ -285,7 +285,7 @@ python ps_sbas_snapxtra.py 7 param_proj.config
 | `python ps_sbas_snapxtra.py config -t 2 -m 1` | StaMPS SBAS |
 | `python ps_sbas_snapxtra.py config -t 2 -m 2` | StaMPS PS |
 
-Example  StaMPS SBAS, steps 310:
+Example - StaMPS SBAS, steps 3-10:
 
 ```bash
 python ps_sbas_snapxtra.py param_proj.config -s 3 -e 10 -t 2 -m 1
@@ -326,20 +326,20 @@ baseline=200
 | 1 | AOI & swath setup | WKT / w,e,s,n AOI |
 | 2 | Prepare slices | Per IW |
 | 3 | Coregistered stack | |
-| 4 | Landsea mask | |
+| 4 | Land-sea mask | |
 | 5 | TOPSAR deburst | |
 | 6 | Add elevation | StaMPS path |
 | 7 | Multi-interferograms | |
 | 8 | Merge swaths | Multi-IW |
 | 9 | Subset interferograms | When `clip_roi` set |
-| 1011 | Vector AOI mask | Optional `msk_shp` |
-| 1213 | Bandmath / PS filter | StaMPS |
+| 10-11 | Vector AOI mask | Optional `msk_shp` |
+| 12-13 | Bandmath / PS filter | StaMPS |
 | 14 | Multilook | `Range`, `Azimuth` |
-| 1517 | StaMPS coreg merge/subset/mask | |
+| 15-17 | StaMPS coreg merge/subset/mask | |
 | 18 | Goldstein filter | LiCSBAS |
-| 1922 | SNAPHU export ? unwrap ? import | |
-| 2324 | Terrain correction ? GeoTIFF | LiCSBAS `GEOC/` |
-| 2527 | StaMPS coreg ML + export | `Stamps_sbas/` / `Stamps_ps/` |
+| 19-22 | SNAPHU export -> unwrap -> import | |
+| 23-24 | Terrain correction -> GeoTIFF | LiCSBAS `GEOC/` |
+| 25-27 | StaMPS coreg ML + export | `Stamps_sbas/` / `Stamps_ps/` |
 
 **Default end step:** 24 (LiCSBAS), 27 (StaMPS)
 
@@ -424,7 +424,7 @@ chmod +x job_batch.sh
 ```
 
 > **Tip:** Use `-h` on any LiCSBAS script to see accepted parameters and defaults before editing the batch file.  
-> LiCSBAS2 also ships `batch_LiCSBAS.sh`  you can adapt that template instead of writing your own.
+> LiCSBAS2 also ships `batch_LiCSBAS.sh` - you can adapt that template instead of writing your own.
 
 ### Velocity maps & GeoTIFF export
 
@@ -441,10 +441,10 @@ Replace the date stamp in the filename with your own velocity product name.
 
 ---
 
-## StaMPS  PS mode
+## StaMPS - PS mode
 
 **Folder:** `Stamps_ps/INSAR_{master}/`  
-**Install:** [StaMPS](https://github.com/dbekaert/StaMPS)  see the StaMPS manual for setup.
+**Install:** [StaMPS](https://github.com/dbekaert/StaMPS) - see the StaMPS manual for setup.
 
 Helper MATLAB scripts (`insar_time_ps.m`, `fix_stamps_csv.py`, etc.) are available in the StaMPS `matlab/` folder (also bundled in some project exports).
 
@@ -463,7 +463,7 @@ stamps(5,5)
 stamps(6,6)
 ```
 
-### Atmospheric correction (TRAIN) + steps 78
+### Atmospheric correction (TRAIN) + steps 7-8
 
 ```matlab
 % Install TRAIN, then:
@@ -474,12 +474,12 @@ stamps(6,7)   % re-run step 6 after APS if needed
 stamps(8,8)
 ```
 
-### Batch mode  `insar_time_ps`
+### Batch mode - `insar_time_ps`
 
-Runs steps 17 (including APS and re-runs) in one call:
+Runs steps 1-7 (including APS and re-runs) in one call:
 
 ```matlab
-insar_time_ps()        % all steps 17
+insar_time_ps()        % all steps 1-7
 insar_time_ps(3)       % from step 3 to end
 insar_time_ps(2, 4)    % steps 2 through 4 only
 insar_time_ps(1, 1)    % step 1 only
@@ -497,7 +497,7 @@ plot_sb_baselines                         % baseline plot
 
 ---
 
-## StaMPS  SBAS mode
+## StaMPS - SBAS mode
 
 **Folder:** `Stamps_sbas/INSAR_{master}/`
 
@@ -514,14 +514,14 @@ Confirm small-baseline processing is enabled:
 setparm('small_baseline_flag','y')
 ```
 
-### Batch mode  `insar_time_sb`
+### Batch mode - `insar_time_sb`
 
 Same calling convention as PS:
 
 ```matlab
 insar_time_sb()        % all steps
 insar_time_sb(3)       % from step 3 to end
-insar_time_sb(2, 4)    % steps 24 only
+insar_time_sb(2, 4)    % steps 2-4 only
 insar_time_sb(1, 1)    % step 1 only
 ```
 
@@ -543,8 +543,8 @@ SBAS requires connected network. If there is disjoint network forming two or mor
 
 To combine PS and SBAS pixels in one StaMPS project:
 
-1. **During SNAPxtra export**  leave `Range` **empty** in the config for StaMPS SBAS so both PS and SBAS stacks stay single-look and grid-compatible.
-2. **Before `mt_prep_snap`**  copy contents of `Stamps_ps/INSAR_{master}/` into `Stamps_sbas/INSAR_{master}/`.
+1. **During SNAPxtra export** - leave `Range` **empty** in the config for StaMPS SBAS so both PS and SBAS stacks stay single-look and grid-compatible.
+2. **Before `mt_prep_snap`** - copy contents of `Stamps_ps/INSAR_{master}/` into `Stamps_sbas/INSAR_{master}/`.
 
 ---
 
@@ -597,7 +597,7 @@ python fix_stamps_csv.py filename.csv insar_filename.csv
 **In QGIS**
 
 1. Install the **QGIS InSAR Explorer** plugin
-2. *Layer ? Add Layer ? Add Delimited Text Layer* ? select `insar_filename.csv`
+2. *Layer -> Add Layer -> Add Delimited Text Layer* -> select `insar_filename.csv`
 3. Use InSAR Explorer to explore; export rasters as GeoTIFF if needed
 
 ---
@@ -606,7 +606,7 @@ python fix_stamps_csv.py filename.csv insar_filename.csv
 
 ```matlab
 ps_save_kml_ps('v-dao','ps_vel.kml', 50, 1)
-%                                      ¦   +- opacity (01)
+%                                      |   +- opacity (0-1)
 %                                      +---- group every N points as one placemark
 ```
 
@@ -636,17 +636,17 @@ ps_plot('v-dao', 2)    % velocity with hillshade background
 
 ```text
 SNAPxtra (ps_sbas_snapxtra.py)
-        ¦
-        +- insar_target=1 --? GEOC/ --? LiCSBAS12+ --? velocity / GeoTIFF / KMZ
-        ¦
-        +- insar_target=2 ---- PS  (Stamps_ps/)  --? stamps / insar_time_ps --? ps_plot, CSV, KML
-                            +- SBAS (Stamps_sbas/) --? insar_time_sb --? sb_baseline_plot, CSV
+        |
+        +- insar_target=1 --> GEOC/ --> LiCSBAS12+ --> velocity / GeoTIFF / KMZ
+        |
+        +- insar_target=2 ---- PS  (Stamps_ps/)  --> stamps / insar_time_ps --> ps_plot, CSV, KML
+                            +- SBAS (Stamps_sbas/) --> insar_time_sb --> sb_baseline_plot, CSV
 ```
 
 ---
 # StaMPS Processing Notes, GCC Patch, and Patch Estimation
 
-## ?? Warning: StaMPS Patch for Newer GCC Versions
+## Warning: StaMPS Patch for Newer GCC Versions
 
 When StaMPS is compiled with newer GCC versions, `mt_prep_snap` may return `inf` while calculating the **mean amplitude**.
 
@@ -807,7 +807,7 @@ Total patches = 5 × 2 = 10
 Assuming the candidate pixels were uniformly distributed:
 
 ```text
-6,208,229 / 10  620,823 candidate pixels per patch
+6,208,229 / 10 ~ 620,823 candidate pixels per patch
 ```
 
 The actual number of candidates in each patch may vary because candidate pixels are not necessarily distributed uniformly across the scene.
@@ -835,13 +835,13 @@ the approximate patch dimensions are:
 ### Range
 
 ```text
-39699 / 5  7940 pixels
+39699 / 5 ~ 7940 pixels
 ```
 
 ### Azimuth
 
 ```text
-9115 / 2  4558 pixels
+9115 / 2 ~ 4558 pixels
 ```
 
 Therefore, each patch is approximately:
@@ -874,8 +874,8 @@ az_overlap = 400
 This corresponds approximately to:
 
 ```text
-Range overlap    10%
-Azimuth overlap  9%
+Range overlap   ~ 10%
+Azimuth overlap ~ 9%
 ```
 
 Therefore, the patch configuration is:
